@@ -1,0 +1,21 @@
+default:
+	gcc -g -std=c99 -Wall -Wextra lab0.c -o lab0 
+check: default code2test
+	if [[ ! -s trash.txt ]]; then \
+		echo "passed all test"; \
+	else \
+		cat trash.txt; \
+		rm -f trash.txt; \
+	fi
+clean: 
+	rm -rf lab0 *.txt *.tar.gz  
+dist: 
+	tar -czvf lab0-804796478.tar.gz README Makefile lab0.c backtrace.png breakpoint.png
+code2test:
+	echo "double bracket syntax is not portable" > bail.txt; \
+	chmod -r bail.txt; \ 
+	./lab0 --input=bail.txt --output=temp.txt 1&>/dev/null; \
+	if [[ $$? -ne 2 ]]; then \
+		echo "fail to open a file and did not exit 2">>trash.txt; \
+	fi; \
+	rm -f bail.txt temp.txt

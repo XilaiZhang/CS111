@@ -1,0 +1,39 @@
+NAME: Xilai Zhang
+EMAIL: xilaizhang@g.ucla.edu
+ID: 804796478
+
+Here are the sources I used:
+https://stackoverflow.com/questions/23489934/echo-2-some-text-what-does-it-mean-in-shell-scripting
+https://stackoverflow.com/questions/11755312/redirecting-stdout-and-stderr-inside-a-makefile-rule
+>& I used these to understand redirection in the functions.sh of which the P0_check.sh calls upon
+https://www.gnu.org/software/libc/manual/html_node/Using-Getopt.html#Using-Getopt
+I used this to study getopt
+I studied signal chapter from the CS33 textbook
+https://www.gnu.org/software/libc/manual/html_node/Getopt-Long-Options.html
+https://www.gnu.org/software/libc/manual/html_node/Getopt-Long-Option-Example.html
+https://www.gnu.org/software/libc/manual/html_node/Getopt-Long-Option-Example.html
+I used these to study getopt long
+http://man7.org/linux/man-pages/man2/dup.2.html
+to study dup
+http://www.comptechdoc.org/os/linux/programming/linux_pgsignals.html
+linux signals
+https://www.gnu.org/software/emacs/manual/html_node/emacs/Scrolling.html
+emacs scrolling
+http://man7.org/linux/man-pages/man2/open.2.html
+open
+https://stackoverflow.com/questions/39002052/how-i-can-print-to-stderr-in-c/39002243
+https://www.tutorialspoint.com/c_standard_library/c_function_strerror.htm
+http://man7.org/linux/man-pages/man3/strerror.3.html
+print to stderr
+https://help.unc.edu/help/how-to-use-unix-and-linux-file-permissions/
+read write permissions
+https://linux.die.net/man/2/creat
+creat
+http://man7.org/linux/man-pages/man2/read.2.html
+read
+http://man7.org/linux/man-pages/man2/write.2.html
+write
+https://web.cs.ucla.edu/classes/spring18/cs111/projects/fd_juggling.html
+some nice examples provided by Professor Kampe
+https://www.cprogramming.com/debugging/segfaults.html
+backtrace and nullpointer
