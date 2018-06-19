@@ -1,0 +1,23 @@
+NAME: Xilai Zhang
+EMAIL: xilaizhang@g.ucla.edu
+ID: 804796478
+
+included files:
+lab4b.c: a source file that after compilation, measures the surrounding
+temperature. It is compiled and built on beaglebone green. It also takes
+several kinds of commands from the stdin, such as changing sampling period.
+Makefile: contains make clean,dist,check and default options. 
+README: a brief description of lab4b.
+
+used websites(not all):
+https://linux.die.net/man/3/localtime
+http://man7.org/linux/man-pages/man2/gettimeofday.2.html
+https://drive.google.com/drive/folders/0B6dyEb8VXZo-N3hVcVI0UFpWSVk
+http://man7.org/linux/man-pages/man2/time.2.html
+http://man7.org/linux/man-pages/man3/strftime.3.html
+http://man7.org/linux/man-pages/man3/difftime.3.html
+http://man7.org/linux/man-pages/man3/fopen.3.html
+https://stackoverflow.com/questions/15060286/any-differences-with-1f-and-01f
+http://man7.org/linux/man-pages/man3/fflush.3.html
+
+I also posted some questions on piazza, see question @412 and question @413.

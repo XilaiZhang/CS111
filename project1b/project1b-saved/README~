@@ -1,0 +1,16 @@
+NAME: Xilai Zhang
+EMAIL: xilaizhang@g.ucla.edu
+ID: 804796478
+
+I am running out of time and I do not want to use slip day so this will be 
+a short readme. The lab1b-client.c and lab1b-server.c, after compilation,
+will set up a communication through socket. And the server is also connected
+to a shell.Makefile can make with different options.
+
+I have spent a lot of time debugging, and by now, I still have not figured out
+why I fail the compressed SENT commands test in the sanity check. I figured
+out a previous bug that took me three days because I forgot to put break after
+one of the case statement. 
+
+The sources I used are the tutorials link the professor posted and the sample
+code the TA gave during discussion session.

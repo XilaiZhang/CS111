@@ -1,0 +1,266 @@
+#!/usr/local/cs/bin/python3
+import copy
+import sys  #sys.argv
+import csv #then we can use reader and writer
+
+exit_status=0;
+
+#create structs to store information returned by reader
+#process list of strings and initialization
+class Superinfo:
+	def __init__(self,row):
+		self.s_blocks_count=int(row[1])
+		self.s_inodes_count=int(row[2])
+		self.blocksize=int(row[3])
+		self.s_inode_size=int(row[4])
+		self.s_blocks_per_group=int(row[5])
+		self.s_inodes_per_group=int(row[6])
+		self.s_first_inode=int(row[7])
+
+
+
+class Inodeinfos:
+	def __init__(self,row):
+		self.inode_number=int(row[1])
+		self.file_type=row[2]  #string
+		self.i_mode=row[3]
+		self.i_uid=int(row[4])
+		self.i_gid=int(row[5])
+		self.i_links_count=int(row[6])
+		self.i_ctime=row[7]
+		self.i_mtime=row[8]
+		self.i_atime=row[9]
+		self.i_size=int(row[10])
+		self.i_blocks=int(row[11])
+		self.blocks=[int(row[i]) for i in range(12,24)]
+		self.indirblocks=[int(row[i]) for i in range(24,27)]
+
+class Dirinfos:
+	def __init__(self,row):
+		self.parent_inode=int(row[1])
+		self.byte_offset=int(row[2])
+		self.dir_inode=int(row[3])
+		self.dir_rec_len=int(row[4])
+		self.dir_name_len=int(row[5])
+		self.dir_name=row[6]
+
+class Indirinfos:
+	def __init__(self,row):
+		self.inode_number=int(row[1])
+		self.level=int(row[2])
+		self.logic_offset=int(row[3])
+		self.block_number=int(row[4])
+		self.reference_number=int(row[5])
+
+
+def inode_allocation_audit(superinfo,freelist_inodes,inodeinfos):
+	allocated_inode=[]
+	for inode in inodeinfos:
+		if inode.file_type != '0':
+			allocated_inode.append(inode.inode_number)
+	#now allocated inode contains valid inode numbers, numbers
+	for inode in allocated_inode:
+		if inode in freelist_inodes:
+			print("ALLOCATED INODE {} ON FREELIST".format(inode))
+			#https://docs.python.org/3/tutorial/inputoutput.html
+			exit_status=2
+	for inode in range(superinfo.s_first_inode,superinfo.s_inodes_count):
+		if inode not in allocated_inode and inode not in freelist_inodes:
+			print("UNALLOCATED INODE {} NOT ON FREELIST".format(inode))
+			exit_status=2
+	
+	return allocated_inode
+		
+def directory_consistency_audit(superinfo,allocated_inode,inodeinfos,dirinfos):
+        linkcountmap=[0]*(superinfo.s_inodes_count+1)
+        #plus one so don't deal with offset while mapping
+        belongmap=[0]*(superinfo.s_inodes_count+1)
+        
+        for dir in dirinfos:
+                if dir.dir_inode > superinfo.s_inodes_count or dir.dir_inode < 1:
+#https://stackoverflow.com/questions/2099121/why-do-inode-numbers-start-from-1-and-not-0 inode start from 1 not 0
+                        exit_status =2 
+                        print("DIRECTORY INODE {} NAME {} INVALID INODE {}".format(dir.parent_inode, dir.dir_name, dir.dir_inode))
+                elif dir.dir_inode not in allocated_inode:
+                        exit_status=2
+                        print("DIRECTORY INODE {} NAME {} UNALLOCATED INODE {}".format(dir.parent_inode, dir.dir_name, dir.dir_inode))
+                else:
+                        linkcountmap[dir.dir_inode]+=1
+                        if dir.dir_name != "'..'" and dir.dir_name != "'.'":
+                                belongmap[dir.dir_inode]=dir.parent_inode
+        
+        for inode in inodeinfos:
+                if inode.i_links_count != linkcountmap[inode.inode_number]:
+                        exit_status=2
+                        print("INODE {} HAS {} LINKS BUT LINKCOUNT IS {}".format(inode.inode_number, linkcountmap[inode.inode_number], inode.i_links_count))
+                
+        for dir in dirinfos:
+                if dir.name == "'.'":
+                        if dir.parent_inode != dir.inode_number:
+                                exit_status=2
+                                print("DIRECTORY INODE {} NAME '.' LINK TO INODE {} SHOULD BE {}".format(dir.parent_inode, dir.inode_number, dir.parent_inode))
+                if dir.name == "'..'":
+                        if dir.inode_mumber != belongmap[dir.parent_inode]:
+                                exit_status=2
+                                print("DIRECTORY INODE {} NAME '..' LINK TO INODE {} SHOULD BE {}".format(dir.parent_inode, dir.inode_number, dir.parent_inode))
+
+
+if __name__ == '__main__':
+	if(len(sys.argv))!=2:
+		print("usage: ./lab3b [csv]",file=sys.stderr)
+		#we have to make sure to use a new version of python to use above syntax
+		sys.exit(1)
+	#create struct to store
+	superinfo=None
+	freelist_blocks=[]
+	freelist_inodes=[]
+	inodeinfos=[]
+	dirinfos=[]
+	indirinfos=[]
+	group=None
+	
+	# https://docs.python.org/3/library/csv.html
+	#detailed objects in csv, here we only use reader
+	try:
+		with open(sys.argv[1],'r') as csvfile:
+			xreader=csv.reader(csvfile)
+			for row in xreader:
+				if row[0]=='SUPERBLOCK':
+					#Each row read from the csv file is returned as a list of strings.
+					superinfo=Superinfo(row)
+					#capitalized is the class name
+				elif row[0]=='BFREE':
+					freelist_blocks.append(int(row[1]))
+				elif row[0]=='IFREE':
+					freelist_inodes.append(int(row[1]))
+				elif row[0]=='INODE':
+					inodeinfos.append(Inodeinfos(row))
+				elif row[0]=='DIRENT':
+					dirinfos.append(Dirinfos(row))
+				elif row[0]=='INDIRECT':
+					indirinfos.append(Indirinfos(row))
+
+
+	except(IOError,OSError):
+		print("cannot open file to read",file=sys.stderr)
+		#we have to make sure to use a new version of python to use above syntax
+		sys.exit(1)
+	
+	#fill in function calls here
+	allocated_inode=inode_allocation_audit(superinfo,freelist_inodes,inodeinfos)
+        directory_consistency_audit(superinfo,allocated_inode,inodeinfos,dirinfos)
+
+
+
+	#block audit
+
+
+	#free map
+	free_map = {key:"free" for key in freelist_blocks}
+	allocated_map = {}
+
+	
+	inodes_per_block = superinfo.blocksize/superinfo.s_inode_size
+	num_inode_table_blocks = superinfo.s_inodes_per_group/inodes_per_block
+	num_reserved_blocks = 5 + num_inode_table_blocks # including block 0
+
+	for inode in inodeinfos:
+		logic_offset = 0
+		for blocknum in inode.blocks + inode.indirblocks:
+
+			if(blocknum != 0): #if direct; this part is for building allocated map
+				l_off = logic_offset
+				indirectness = ""
+				if(logic_offset == 12):
+					indirectness = "INDIRECT "
+				if(logic_offset == 13):
+					l_off = 268
+					indirectness = "DOUBLE INDIRECT "
+				if(logic_offset == 14):
+					l_off = 65804
+					indirectness = "TRIPLE INDIRECT "
+				str_to_add = "REF:DUPLICATE {}BLOCK {} IN INODE {} AT OFFSET {}".format(indirectness,blocknum, inode.inode_number, l_off)
+				if(blocknum in allocated_map):
+					allocated_map[blocknum].append( str_to_add )
+				else:
+					allocated_map[blocknum] = [str_to_add]	 		
+
+				if(blocknum in free_map):
+					print("ALLOCATED BLOCK {} ON FREELIST".format(blocknum))
+
+			if(blocknum < 0 or blocknum >= superinfo.s_blocks_count):
+				if(logic_offset<12):	
+					print("INVALID BLOCK {} IN INODE {} AT OFFSET {}".format(blocknum, inode.inode_number, logic_offset))
+				elif(logic_offset==12):
+					print("INVALID INDIRECT BLOCK {} IN INODE {} AT OFFSET {}".format(blocknum, inode.inode_number, logic_offset))				
+				elif(logic_offset==13):
+					print("INVALID DOUBLE INDIRECT BLOCK {} IN INODE {} AT OFFSET {}".format(blocknum, inode.inode_number, 268))				
+				elif(logic_offset==14):
+					print("INVALID TRIPLE INDIRECT BLOCK {} IN INODE {} AT OFFSET {}".format(blocknum, inode.inode_number, 65804))				
+			
+			if(blocknum > 0 and blocknum < num_reserved_blocks):
+				if(logic_offset<12):	
+					print("RESERVED BLOCK {} IN INODE {} AT OFFSET {}".format(blocknum, inode.inode_number, logic_offset))
+				elif(logic_offset==12):
+					print("RESERVED INDIRECT BLOCK {} IN INODE {} AT OFFSET {}".format(blocknum, inode.inode_number, logic_offset))				
+				elif(logic_offset==13):
+					print("RESERVED DOUBLE INDIRECT BLOCK {} IN INODE {} AT OFFSET {}".format(blocknum, inode.inode_number, 268))				
+				elif(logic_offset==14):
+					print("RESERVED TRIPLE INDIRECT BLOCK {} IN INODE {} AT OFFSET {}".format(blocknum, inode.inode_number, 65804))				
+
+			logic_offset = logic_offset+1
+
+
+	#indirect blocks
+	for indirinfo in indirinfos:
+		indirectness = ""
+		if(indirinfo.level == 1):
+			indirectness = "INDIRECT "
+		if(indirinfo.level == 2):
+			indirectness = "DOUBLE INDIRECT "
+		if(indirinfo.level == 3):
+			indirectness = "TRIPLE INDIRECT "
+
+		str_to_add =  "REF:DUPLICATE {}BLOCK {} IN INODE {} AT OFFSET {}".format(indirectness, indirinfo.reference_number, indirinfo.inode_number, indirinfo.logic_offset)
+		if(indirinfo.reference_number in allocated_map):
+			allocated_map[indirinfo.reference_number].append(str_to_add)
+		else:
+			allocated_map[indirinfo.reference_number] = [str_to_add]
+
+		str_to_add =  "BLK:DUPLICATE {}BLOCK {} IN INODE {} AT OFFSET {}".format(indirectness, indirinfo.block_number, indirinfo.inode_number, indirinfo.logic_offset)
+		if(indirinfo.block_number in allocated_map):
+			allocated_map[indirinfo.block_number].append(str_to_add)
+		else:
+			allocated_map[indirinfo.block_number] = [str_to_add]
+
+		if(indirinfo.reference_number in free_map):
+			print("ALLOCATED BLOCK {} ON FREELIST".format(indirinfo.reference_number))
+
+		if(indirinfo.reference_number < 0 or indirinfo.reference_number >= superinfo.s_blocks_count ):
+			print("INVALID {}BLOCK {} IN INODE {} AT OFFSET {}".format(indirectness, indirinfo.reference_number, indirinfo.inode_number, indirinfo.logic_offset))		   
+		if(indirinfo.reference_number > 0 and indirinfo.reference_number < num_reserved_blocks):
+			print("RESERVED {}BLOCK {} IN INODE {} AT OFFSET {}".format(indirectness, indirinfo.reference_number, indirinfo.inode_number, indirinfo.logic_offset))
+			
+
+	# checking duplicates
+	for key in allocated_map:
+		#print(allocated_map[key])
+		nondups_filtered = list(filter(lambda s: "REF" in s,allocated_map[key]))
+		#print(nondups_filtered)
+		if(len(nondups_filtered) > 1):
+			for error_output in nondups_filtered:
+				print(error_output[4:])
+
+	# check unreferenced
+	for i in range(int(num_reserved_blocks), superinfo.s_blocks_count):
+		if i not in allocated_map and i not in free_map:
+			print("UNREFERENCED BLOCK {}".format(i))
+
+
+	#endblockaudit
+
+
+
+
+
+	sys.exit(exit_status)

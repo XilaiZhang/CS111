@@ -1,0 +1,217 @@
+#define _POSIX_C_SOURCE 199309L //very obssessed with c99 so have to make timespec usable
+#include <stdio.h>  //for printf and primitive stuff
+#include <stdlib.h>
+#include <getopt.h>  //used for getopt long
+#include <string.h>
+#include <errno.h>
+#include <time.h>  //for the gettime function
+#include <pthread.h>  //used for pthread functions
+#include <sched.h>   //used for yield
+#include "SortedList.h"
+#include <signal.h> //used to detect segmentation fault
+pthread_mutex_t lock;
+int mutexflag=0;
+int spinflag=0;
+int spinvalue=0;
+long long ninepower=1000000000;
+int threads = 1;
+long long iterations = 1;
+int opt_yield = 0;
+SortedList_t *listheader;
+SortedListElement_t * listmember;
+void savetime(char * error, int errornumber){
+  fprintf(stderr, "%s: %s",error,strerror(errornumber));
+  exit(1);
+}
+void handler(int signum)
+{
+  if(signum==SIGSEGV){
+    fprintf(stderr,"segmentation falut: %s", strerror(errno));
+    exit(2);
+  }
+}
+
+void * addfunc (void* startpos){
+  SortedListElement_t *start=(SortedListElement_t *)startpos;
+  for(int i=0;i<iterations;i++){
+    if(mutexflag){
+      pthread_mutex_lock(&lock);
+      SortedList_insert(listheader,start+i);
+      pthread_mutex_unlock(&lock);
+    }
+    else if(spinflag){
+      while(__sync_lock_test_and_set(&spinvalue,1));
+      SortedList_insert(listheader,start+i);
+      __sync_lock_release(&spinvalue);
+    }
+    else{SortedList_insert(listheader,start+i);}
+  }
+  //block for checking the length
+    if(mutexflag){
+      pthread_mutex_lock(&lock);
+      if(SortedList_length(listheader)==-1){fprintf(stderr,"corruption");exit(2);}
+      pthread_mutex_unlock(&lock);
+    }
+    else if(spinflag){
+      while(__sync_lock_test_and_set(&spinvalue,1));
+      if(SortedList_length(listheader)==-1){fprintf(stderr,"corruption");exit(2);}
+      __sync_lock_release(&spinvalue);
+    }
+    else{
+      if(SortedList_length(listheader)==-1){fprintf(stderr,"corruption");exit(2);}
+    }
+  for(int i=0; i<iterations;i++){
+    if(mutexflag){
+      pthread_mutex_lock(&lock);
+      SortedListElement_t *mark=SortedList_lookup(listheader,start[i].key);
+     if(SortedList_lookup(listheader,start[i].key)==NULL){
+      fprintf(stderr,"lookup corruption");exit(2);
+     }
+     if(SortedList_delete(mark)!=0){
+      fprintf(stderr,"delete corruption");exit(2);
+     }
+      pthread_mutex_unlock(&lock);
+    }
+    else if(spinflag){
+      while(__sync_lock_test_and_set(&spinvalue,1));
+      SortedListElement_t *mark=SortedList_lookup(listheader,start[i].key);
+     if(SortedList_lookup(listheader,start[i].key)==NULL){
+      fprintf(stderr,"lookup corruption");exit(2);
+     }
+     if(SortedList_delete(mark)!=0){
+      fprintf(stderr,"delete corruption");exit(2);
+     }
+      __sync_lock_release(&spinvalue);
+    }
+    else{
+     SortedListElement_t *mark=SortedList_lookup(listheader,start[i].key);
+     if(SortedList_lookup(listheader,start[i].key)==NULL){
+      fprintf(stderr,"lookup corruption");exit(2);
+     }
+     if(SortedList_delete(mark)!=0){
+      fprintf(stderr,"delete corruption");exit(2);
+     } 
+    }
+    
+  }
+  return NULL;
+
+}
+
+int main(int argc, char **argv)
+{
+  static struct option long_options[]=
+    {
+      {"threads",required_argument, 0, 't'},
+      {"iterations",required_argument, 0, 'i'},
+      {"yield",required_argument, 0,'y'},
+      {"sync",required_argument,0,'s'},
+      {0,0,0,0}
+    };
+  int ret;
+  while((ret= getopt_long(argc,argv, "t:i:y:s:", long_options, NULL))!=-1){
+    switch(ret){
+    case 't':
+      threads=atoi(optarg);
+      break;
+    case 'i':
+      iterations=atoi(optarg);
+      break;
+    case 'y':
+      for(size_t i=0;i<strlen(optarg);i++){
+	if(optarg[i]=='i'){
+	  opt_yield |= INSERT_YIELD;}
+	else if(optarg[i]=='d'){
+	    opt_yield |= DELETE_YIELD;}
+	else if(optarg[i]=='l'){
+	  opt_yield |= LOOKUP_YIELD;}
+	else{fprintf(stderr, "incorrect usage");
+	  exit(1);
+	}
+      }//end of string loop for
+      //to be filled later
+      break;
+    case 's':
+      if((optarg[0]=='m')&&strlen(optarg)==1)
+	{mutexflag=1;}
+      else if((optarg[0]=='s')&&strlen(optarg)==1)
+	{spinflag=1;}
+      else{fprintf(stderr, "incorrect usage");
+	  exit(1);
+	}
+      //to be filled later
+      break;
+    default:
+      fprintf(stderr,"unknown option");
+      exit(1);
+    }//end switch
+  }//end while loop
+  
+  
+  if(signal(SIGSEGV,handler)==SIG_ERR){
+    savetime("signal not sent:",errno);}
+  listheader=malloc(sizeof(SortedList_t));
+  listheader->key=NULL;
+  listheader->prev=listheader;
+  listheader->next=listheader;
+  long long number= threads * iterations;
+  listmember=malloc(number*sizeof(SortedListElement_t));
+  srand(time(NULL));//randomize seed https://stackoverflow.com/questions/16569239/how-to-use-function-srand-with-time-h
+  for(int i=0;i<number;i++){ 
+     char *keystring = malloc((4+1) * sizeof(char)); //choose 3 to be the length of our key. I am assuming that freeing the whole list will free each node
+     for(int k=0;k<4;k++){
+       keystring[k] = 'a' + (char)rand()%26;}
+     keystring[4]='\0';
+     listmember[i].key = (const char *) keystring;
+  }
+  pthread_t * threadarray=malloc(threads*sizeof(pthread_t));
+  struct timespec start;
+  if (clock_gettime(CLOCK_MONOTONIC, &start)<0) { 
+    savetime("gettime error:",errno);}
+  
+  for(int i=0;i<threads;i++){
+    if(pthread_create(&threadarray[i],NULL,addfunc,listmember+i*iterations)!=0) 
+      {savetime("pthread create error",errno);}
+  }
+  
+  for(int i=0;i<threads;i++){
+    if(pthread_join(threadarray[i],NULL)!=0)
+      {savetime("pthread join error",errno);}
+  }
+  
+
+  struct timespec end;
+  if (clock_gettime(CLOCK_MONOTONIC, &end)<0) { 
+    savetime("gettime error:",errno);}
+  
+  if(SortedList_length(listheader)!=0){
+    fprintf(stderr, "list length is not 0,probs error\n");
+    exit(2);
+  }
+  free(threadarray);
+  free(listheader);//in case we forget, also dynamic threads
+  free(listmember);
+
+  long long innano= (end.tv_sec-start.tv_sec)*ninepower+ (end.tv_nsec-start.tv_nsec); //add bracket just for safety
+  long long operations= threads * iterations *3;
+  long long average= innano/operations;
+  char *output;
+  switch(opt_yield){
+  case 0:
+    output="none";
+    break;
+  case 0x01:
+    output="i";
+    break;
+  case 0x02: output="d";break;
+  case 0x04: output="l";break;
+  case 0x03: output="id";break;
+  case 0x05: output="il";break;
+  case 0x06: output="dl";break;
+  case 0x07: output="idl";break;
+  default: output="switch case not correct" ;
+  }
+  printf("list-%s-%s,%d,%lli,1,%lli,%lli,%lli\n",output,mutexflag==1?"m":spinflag==1?"s":"none",threads,iterations,operations,innano,average);
+  exit(0);
+} //end main
+

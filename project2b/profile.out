@@ -1,0 +1,240 @@
+Total: 191 samples
+     164  85.9%  85.9%      191 100.0% addfunc
+      17   8.9%  94.8%       17   8.9% __strcmp_sse42
+       7   3.7%  98.4%       17   8.9% SortedList_insert
+       2   1.0%  99.5%        2   1.0% _init
+       1   0.5% 100.0%       10   5.2% SortedList_lookup
+       0   0.0% 100.0%      191 100.0% __clone
+       0   0.0% 100.0%      191 100.0% start_thread
+ROUTINE ====================== addfunc in /u/ee/ugrad/xzhang/project2b/lab2_list.c
+   164    191 Total samples (flat / cumulative)
+     .      .   34:     fprintf(stderr,"segmentation falut: %s", strerror(errno));
+     .      .   35:     exit(2);
+     .      .   36:   }
+     .      .   37: }
+     .      .   38: 
+---
+     .      .   39: void * addfunc (void* startpos){
+     .      .   40:   SortedListElement_t *start=(SortedListElement_t *)startpos;int startposition=*(int *)startpos;
+     .      .   41:   struct timespec lockstart;
+     .      .   42:   struct timespec lockend;
+     .      .   43:   int length=0;
+     .      .   44:   for(int i=0;i<iterations;i++){
+     .      .   45:     if(mutexflag){
+     .      .   46:       if(clock_gettime(CLOCK_MONOTONIC,&lockstart)==-1){savetime("gettime error:",errno);}
+     .      .   47:       pthread_mutex_lock(&mutexpointers[(startposition+i)%listsize]);
+     .      .   48:       if(clock_gettime(CLOCK_MONOTONIC,&lockend)==-1){savetime("gettime error:",errno);}
+     .      .   49:       totallock+=ninepower*(lockend.tv_sec-lockstart.tv_sec)+(lockend.tv_nsec-lockstart.tv_nsec);
+     .      .   50:       SortedList_insert(&listpointers[(startposition+i)%listsize],start+i);
+     .      .   51:       pthread_mutex_unlock(&mutexpointers[(startposition+i)%listsize]);
+     .      .   52:     }
+     .      .   53:     else if(spinflag){
+     .      .   54:       if(clock_gettime(CLOCK_MONOTONIC,&lockstart)==-1){savetime("gettime error:",errno);}
+   139    139   55:       while(__sync_lock_test_and_set(&spinpointers[(startposition+i)%listsize],1));
+     .      .   56:       if(clock_gettime(CLOCK_MONOTONIC,&lockend)==-1){savetime("gettime error:",errno);}
+     .      .   57:       totallock+=ninepower*(lockend.tv_sec-lockstart.tv_sec)+(lockend.tv_nsec-lockstart.tv_nsec);
+     .     17   58:       SortedList_insert(&listpointers[(startposition+i)%listsize],start+i);
+     .      .   59:       __sync_lock_release(&spinpointers[(startposition+i)%listsize]);
+     .      .   60:     }
+     .      .   61:     else{SortedList_insert(&listpointers[(startposition+i)%listsize],start+i);}
+     .      .   62:   }
+     .      .   63:   //block for checking the length
+     .      .   64:   
+     .      .   65:   if(mutexflag){
+     .      .   66:     for(int j=0;j<listsize;j++){ //this needs a back bracket    
+     .      .   67:       if(clock_gettime(CLOCK_MONOTONIC,&lockstart)==-1){savetime("gettime error:",errno);}
+     .      .   68:       pthread_mutex_lock(&mutexpointers[j]);
+     .      .   69:       if(clock_gettime(CLOCK_MONOTONIC,&lockend)==-1){savetime("gettime error:",errno);}
+     .      .   70:       totallock+=ninepower*(lockend.tv_sec-lockstart.tv_sec)+(lockend.tv_nsec-lockstart.tv_nsec);
+     .      .   71:       int temp=SortedList_length(&listpointers[j]);
+     .      .   72:       if(temp==-1){fprintf(stderr,"corruption");exit(2);}
+     .      .   73:       else{length+=temp;}
+     .      .   74:       pthread_mutex_unlock(&mutexpointers[j]);
+     .      .   75:     }
+     .      .   76:   } //bracket for the loop
+     .      .   77:     else if(spinflag){
+     .      .   78:       for(int j=0;j<listsize;j++){ //this needs a back bracket  
+     .      .   79:       if(clock_gettime(CLOCK_MONOTONIC,&lockstart)==-1){savetime("gettime error:",errno);}
+     .      .   80:       while(__sync_lock_test_and_set(&spinpointers[j],1));
+     .      .   81:       if(clock_gettime(CLOCK_MONOTONIC,&lockend)==-1){savetime("gettime error:",errno);}
+     .      .   82:       totallock+=ninepower*(lockend.tv_sec-lockstart.tv_sec)+(lockend.tv_nsec-lockstart.tv_nsec);
+     .      .   83:       int temp=SortedList_length(&listpointers[j]);
+     .      .   84:       if(temp==-1){fprintf(stderr,"corruption");exit(2);}
+     .      .   85:       else{length+=temp;}
+     .      .   86:       __sync_lock_release(&spinpointers[j]);
+     .      .   87:     }
+     .      .   88:     }
+     .      .   89:     else{
+     .      .   90:       for(int j=0;j<listsize;j++){ //this needs a back bracket  
+     .      .   91: 	int temp=SortedList_length(&listpointers[j]);
+     .      .   92: 	if(temp==-1){fprintf(stderr,"corruption");exit(2);}
+     .      .   93: 	else{length+=temp;}
+     .      .   94:       }
+     .      .   95:     }
+     .      .   96:     //end of for loop
+     .      .   97:     //block for lookup and delete
+     .      .   98:     for(int i=0; i<iterations;i++){
+     .      .   99:     if(mutexflag){
+     .      .  100:       if(clock_gettime(CLOCK_MONOTONIC,&lockstart)==-1){savetime("gettime error:",errno);}
+     .      .  101:       pthread_mutex_lock(&mutexpointers[(startposition+i)%listsize]);
+     .      .  102:       if(clock_gettime(CLOCK_MONOTONIC,&lockend)==-1){savetime("gettime error:",errno);}
+     .      .  103:       totallock+=ninepower*(lockend.tv_sec-lockstart.tv_sec)+(lockend.tv_nsec-lockstart.tv_nsec);
+     .      .  104:       SortedListElement_t *mark=SortedList_lookup(&listpointers[(startposition+i)%listsize],start[i].key);
+     .      .  105:      if(mark==NULL){
+     .      .  106:       fprintf(stderr,"lookup corruption");exit(2);
+     .      .  107:      }
+     .      .  108:      if(SortedList_delete(mark)!=0){
+     .      .  109:       fprintf(stderr,"delete corruption");exit(2);
+     .      .  110:      }
+     .      .  111:       pthread_mutex_unlock(&mutexpointers[(startposition+i)%listsize]);
+     .      .  112:     }
+     .      .  113:     else if(spinflag){
+     .      .  114:       if(clock_gettime(CLOCK_MONOTONIC,&lockstart)==-1){savetime("gettime error:",errno);}
+    25     25  115:       while(__sync_lock_test_and_set(&spinpointers[(startposition+i)%listsize],1));
+     .      .  116:       if(clock_gettime(CLOCK_MONOTONIC,&lockend)==-1){savetime("gettime error:",errno);}
+     .      .  117:       totallock+=ninepower*(lockend.tv_sec-lockstart.tv_sec)+(lockend.tv_nsec-lockstart.tv_nsec);
+     .     10  118:       SortedListElement_t *mark=SortedList_lookup(&listpointers[(startposition+i)%listsize],start[i].key);
+     .      .  119:      if(mark==NULL){
+     .      .  120:       fprintf(stderr,"lookup corruption");exit(2);
+     .      .  121:      }
+     .      .  122:      if(SortedList_delete(mark)!=0){
+     .      .  123:       fprintf(stderr,"delete corruption");exit(2);
+     .      .  124:      }
+     .      .  125:       __sync_lock_release(&spinpointers[(startposition+i)%listsize]);
+     .      .  126:     }
+     .      .  127:     else{
+     .      .  128:      SortedListElement_t *mark=SortedList_lookup(&listpointers[(startposition+i)%listsize],start[i].key);
+     .      .  129:      if(mark==NULL){
+     .      .  130:       fprintf(stderr,"lookup corruption");exit(2);
+     .      .  131:      }
+     .      .  132:      if(SortedList_delete(mark)!=0){
+     .      .  133:       fprintf(stderr,"delete corruption");exit(2);
+     .      .  134:      } 
+     .      .  135:     }
+     .      .  136:     
+     .      .  137:   }
+     .      .  138:   return NULL;
+     .      .  139: 
+     .      .  140: }
+---
+     .      .  141: 
+     .      .  142: int main(int argc, char **argv)
+     .      .  143: {
+     .      .  144:   static struct option long_options[]=
+     .      .  145:     {
+ROUTINE ====================== addfunc in /u/ee/ugrad/xzhang/project2b/lab2_list.c
+   164    191 Total samples (flat / cumulative)
+     .      .   34:     fprintf(stderr,"segmentation falut: %s", strerror(errno));
+     .      .   35:     exit(2);
+     .      .   36:   }
+     .      .   37: }
+     .      .   38: 
+---
+     .      .   39: void * addfunc (void* startpos){
+     .      .   40:   SortedListElement_t *start=(SortedListElement_t *)startpos;int startposition=*(int *)startpos;
+     .      .   41:   struct timespec lockstart;
+     .      .   42:   struct timespec lockend;
+     .      .   43:   int length=0;
+     .      .   44:   for(int i=0;i<iterations;i++){
+     .      .   45:     if(mutexflag){
+     .      .   46:       if(clock_gettime(CLOCK_MONOTONIC,&lockstart)==-1){savetime("gettime error:",errno);}
+     .      .   47:       pthread_mutex_lock(&mutexpointers[(startposition+i)%listsize]);
+     .      .   48:       if(clock_gettime(CLOCK_MONOTONIC,&lockend)==-1){savetime("gettime error:",errno);}
+     .      .   49:       totallock+=ninepower*(lockend.tv_sec-lockstart.tv_sec)+(lockend.tv_nsec-lockstart.tv_nsec);
+     .      .   50:       SortedList_insert(&listpointers[(startposition+i)%listsize],start+i);
+     .      .   51:       pthread_mutex_unlock(&mutexpointers[(startposition+i)%listsize]);
+     .      .   52:     }
+     .      .   53:     else if(spinflag){
+     .      .   54:       if(clock_gettime(CLOCK_MONOTONIC,&lockstart)==-1){savetime("gettime error:",errno);}
+   139    139   55:       while(__sync_lock_test_and_set(&spinpointers[(startposition+i)%listsize],1));
+     .      .   56:       if(clock_gettime(CLOCK_MONOTONIC,&lockend)==-1){savetime("gettime error:",errno);}
+     .      .   57:       totallock+=ninepower*(lockend.tv_sec-lockstart.tv_sec)+(lockend.tv_nsec-lockstart.tv_nsec);
+     .     17   58:       SortedList_insert(&listpointers[(startposition+i)%listsize],start+i);
+     .      .   59:       __sync_lock_release(&spinpointers[(startposition+i)%listsize]);
+     .      .   60:     }
+     .      .   61:     else{SortedList_insert(&listpointers[(startposition+i)%listsize],start+i);}
+     .      .   62:   }
+     .      .   63:   //block for checking the length
+     .      .   64:   
+     .      .   65:   if(mutexflag){
+     .      .   66:     for(int j=0;j<listsize;j++){ //this needs a back bracket    
+     .      .   67:       if(clock_gettime(CLOCK_MONOTONIC,&lockstart)==-1){savetime("gettime error:",errno);}
+     .      .   68:       pthread_mutex_lock(&mutexpointers[j]);
+     .      .   69:       if(clock_gettime(CLOCK_MONOTONIC,&lockend)==-1){savetime("gettime error:",errno);}
+     .      .   70:       totallock+=ninepower*(lockend.tv_sec-lockstart.tv_sec)+(lockend.tv_nsec-lockstart.tv_nsec);
+     .      .   71:       int temp=SortedList_length(&listpointers[j]);
+     .      .   72:       if(temp==-1){fprintf(stderr,"corruption");exit(2);}
+     .      .   73:       else{length+=temp;}
+     .      .   74:       pthread_mutex_unlock(&mutexpointers[j]);
+     .      .   75:     }
+     .      .   76:   } //bracket for the loop
+     .      .   77:     else if(spinflag){
+     .      .   78:       for(int j=0;j<listsize;j++){ //this needs a back bracket  
+     .      .   79:       if(clock_gettime(CLOCK_MONOTONIC,&lockstart)==-1){savetime("gettime error:",errno);}
+     .      .   80:       while(__sync_lock_test_and_set(&spinpointers[j],1));
+     .      .   81:       if(clock_gettime(CLOCK_MONOTONIC,&lockend)==-1){savetime("gettime error:",errno);}
+     .      .   82:       totallock+=ninepower*(lockend.tv_sec-lockstart.tv_sec)+(lockend.tv_nsec-lockstart.tv_nsec);
+     .      .   83:       int temp=SortedList_length(&listpointers[j]);
+     .      .   84:       if(temp==-1){fprintf(stderr,"corruption");exit(2);}
+     .      .   85:       else{length+=temp;}
+     .      .   86:       __sync_lock_release(&spinpointers[j]);
+     .      .   87:     }
+     .      .   88:     }
+     .      .   89:     else{
+     .      .   90:       for(int j=0;j<listsize;j++){ //this needs a back bracket  
+     .      .   91: 	int temp=SortedList_length(&listpointers[j]);
+     .      .   92: 	if(temp==-1){fprintf(stderr,"corruption");exit(2);}
+     .      .   93: 	else{length+=temp;}
+     .      .   94:       }
+     .      .   95:     }
+     .      .   96:     //end of for loop
+     .      .   97:     //block for lookup and delete
+     .      .   98:     for(int i=0; i<iterations;i++){
+     .      .   99:     if(mutexflag){
+     .      .  100:       if(clock_gettime(CLOCK_MONOTONIC,&lockstart)==-1){savetime("gettime error:",errno);}
+     .      .  101:       pthread_mutex_lock(&mutexpointers[(startposition+i)%listsize]);
+     .      .  102:       if(clock_gettime(CLOCK_MONOTONIC,&lockend)==-1){savetime("gettime error:",errno);}
+     .      .  103:       totallock+=ninepower*(lockend.tv_sec-lockstart.tv_sec)+(lockend.tv_nsec-lockstart.tv_nsec);
+     .      .  104:       SortedListElement_t *mark=SortedList_lookup(&listpointers[(startposition+i)%listsize],start[i].key);
+     .      .  105:      if(mark==NULL){
+     .      .  106:       fprintf(stderr,"lookup corruption");exit(2);
+     .      .  107:      }
+     .      .  108:      if(SortedList_delete(mark)!=0){
+     .      .  109:       fprintf(stderr,"delete corruption");exit(2);
+     .      .  110:      }
+     .      .  111:       pthread_mutex_unlock(&mutexpointers[(startposition+i)%listsize]);
+     .      .  112:     }
+     .      .  113:     else if(spinflag){
+     .      .  114:       if(clock_gettime(CLOCK_MONOTONIC,&lockstart)==-1){savetime("gettime error:",errno);}
+    25     25  115:       while(__sync_lock_test_and_set(&spinpointers[(startposition+i)%listsize],1));
+     .      .  116:       if(clock_gettime(CLOCK_MONOTONIC,&lockend)==-1){savetime("gettime error:",errno);}
+     .      .  117:       totallock+=ninepower*(lockend.tv_sec-lockstart.tv_sec)+(lockend.tv_nsec-lockstart.tv_nsec);
+     .     10  118:       SortedListElement_t *mark=SortedList_lookup(&listpointers[(startposition+i)%listsize],start[i].key);
+     .      .  119:      if(mark==NULL){
+     .      .  120:       fprintf(stderr,"lookup corruption");exit(2);
+     .      .  121:      }
+     .      .  122:      if(SortedList_delete(mark)!=0){
+     .      .  123:       fprintf(stderr,"delete corruption");exit(2);
+     .      .  124:      }
+     .      .  125:       __sync_lock_release(&spinpointers[(startposition+i)%listsize]);
+     .      .  126:     }
+     .      .  127:     else{
+     .      .  128:      SortedListElement_t *mark=SortedList_lookup(&listpointers[(startposition+i)%listsize],start[i].key);
+     .      .  129:      if(mark==NULL){
+     .      .  130:       fprintf(stderr,"lookup corruption");exit(2);
+     .      .  131:      }
+     .      .  132:      if(SortedList_delete(mark)!=0){
+     .      .  133:       fprintf(stderr,"delete corruption");exit(2);
+     .      .  134:      } 
+     .      .  135:     }
+     .      .  136:     
+     .      .  137:   }
+     .      .  138:   return NULL;
+     .      .  139: 
+     .      .  140: }
+---
+     .      .  141: 
+     .      .  142: int main(int argc, char **argv)
+     .      .  143: {
+     .      .  144:   static struct option long_options[]=
+     .      .  145:     {

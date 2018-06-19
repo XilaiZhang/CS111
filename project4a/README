@@ -1,0 +1,13 @@
+NAME: Xilai Zhang
+EMAIL: xilaizhang@g.ucla.edu
+ID: 804796478
+
+BeagleBone serial number: BBGW17090341
+Mac address: 2c:f7:f1:06:6a:d5
+
+my_beaglebone.jpg: my selfie with beaglebone.
+git.png: screenshot of installing git and use git clone.
+build_run.png: a WIFI beaglebone session that build and run hello world program.
+connected.png: ifconfig output diaplay and changed hostname.
+copy.png: used scp command from bash to copy helloworld source code to beaglebone
+WIFI session.

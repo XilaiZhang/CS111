@@ -1,0 +1,11 @@
+NAME: Xilai Zhang
+EMAIL: xilaizhang@g.ucla.edu
+ID: 804796478
+
+Makefile: supports make clean,make dist, and default options.
+lab4c_tcp.c: use tcp connection and sockets to transfer data. the beagelebone
+can thus communicate with the server.
+lab4c_tls.c: use tls connection to transfer data. the beagelebone
+can thus communicate with the server.
+
+resources: several websites that are listed as comments in the source files.

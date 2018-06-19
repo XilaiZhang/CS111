@@ -1,0 +1,19 @@
+NAME: Xian Kai Ng, Xilai Zhang
+EMAIL: ngxiankai286@gmail.com, xilaizhang@g.ucla.edu
+ID: 204785637, 804796478
+
+Kai please run sanity check and see if this is the correct format to 
+put two names and two ids.
+
+We used hexdump
+so as to not get fuqt by the endianness/bit-order
+
+lmao
+
+
+copied the hexdump code from stackoverflow but its not in our final shipped code so all g?
+
+https://stackoverflow.com/questions/7775991/how-to-get-hexdump-of-a-structure-data
+
+
+

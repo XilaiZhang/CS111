@@ -1,0 +1,6 @@
+#!/bin/bash -e
+
+if [ 1 -gt 0 ]
+then
+    echo fuck you
+fi

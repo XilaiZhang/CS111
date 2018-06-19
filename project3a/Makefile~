@@ -1,0 +1,20 @@
+CC=gcc
+CFLAGS = -std=gnu11 -g -O2 -Wall -Wextra -Wno-unused-parameter 
+LDLIBS = -pthread
+
+build:
+	$(CC) $(CFLAGS) -o lab3a $(LDLIBS) lab3a.c -lmath
+
+
+
+
+.PHONY: clean
+clean:
+	rm  lab3a-204785637.tar.gz 
+
+
+
+
+dist:
+	tar -czvf lab3a-204785637.tar.gz *.c *.h README Makefile 
+
