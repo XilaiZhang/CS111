@@ -1,0 +1,303 @@
+#define _POSIX_SOURCE //stop the warning from kill
+#include <stdio.h>
+#include <stdlib.h>   //to use atexit
+#include <getopt.h>      //for get opt
+#include <errno.h>
+#include <termios.h>     //to use termios
+#include <unistd.h>
+#include <string.h>    // to use strerror
+#include <signal.h>  // to use signal
+#include <fcntl.h>   //used by pipe
+#include <sys/types.h> //used by fork
+#include <poll.h>  //used by poll
+#include <sys/wait.h> //used by waitpid
+
+char smallbuffer[1]={'\n'};
+int terminaltoshell[2];
+int shelltoterminal[2];  //don't understand why can't declare right before it
+struct termios dearpointer; //global so that restore can see
+struct termios modified;
+//int ret=0;
+pid_t catch;
+int shellflag=0;
+char minibuffer[2]={'\r','\n'};  //damn C declaration syntax
+void restore()
+{ int ret=tcsetattr(STDIN_FILENO,TCSANOW,&dearpointer);
+  if(ret!=0)
+    { fprintf(stderr, "tcsetattr error: %s", strerror(errno));
+      exit(1);
+    }
+  if(shellflag){
+    int status;//to be filled out later..waitpid and stuff
+    
+    if(waitpid(catch,&status,0)==-1) {fprintf(stderr,"error waitpid: %s", strerror(errno)); exit(1);} //to avoid a warning of type conflict
+    //waitpid(catch,&status,0);
+    if(WIFEXITED(status)) { fprintf(stderr,"SHELL EXIT SIGNAL=%d STATUS=%d\n", 0,WEXITSTATUS(status)); }
+
+    else if(WIFSIGNALED(status)) { fprintf(stderr,"SHELL EXIT SIGNAL=%d STATUS=%d\n", WTERMSIG(status),0); }
+
+    else { fprintf(stderr,"unknown condition.....what is this exit?"); } //this one is just for safety
+  }
+}
+
+void handler(int signum)
+{if(signum==SIGPIPE)
+    {exit(0);}
+}
+int main(int argc, char **argv)
+{  
+  int ret=0;
+  
+  static struct option long_options[]=
+  {
+    {"shell", no_argument, 0, 's'},
+    {0,0,0,0}
+  };
+  
+  while((ret=getopt_long(argc,argv,"s",long_options,NULL))!=-1)
+    {
+      switch(ret){
+        case 's':
+	  shellflag=1;//to be filled
+	  break;
+        default:
+	  fprintf(stderr,"unrecognized option, use: lab1a [--shell] \n");
+	  exit(1);
+      }
+    }
+  //printf("at least this stage1");
+  ret=tcgetattr(STDIN_FILENO, &dearpointer);
+   
+  if(ret<0)//0 on success, -1 on failure
+    { 
+      fprintf(stderr,"tcgetattr is not successful, error msg: %s",strerror(errno)); //errno will be set by tcgetattr
+      exit(1);
+    }
+  atexit(restore); //restore is a function pointer
+  //printf("at least this stage");
+  ret=tcgetattr(STDIN_FILENO, &modified); 
+  if(ret<0)//0 on success, -1 on failure
+    {
+      fprintf(stderr,"tcgetattr is not successful, error msg: %s",strerror(errno)); //errno will be set by tcgetattr
+      exit(1);
+    }
+  modified.c_iflag=ISTRIP;
+  modified.c_oflag=0;
+  modified.c_lflag=0;
+  ret=tcsetattr(STDIN_FILENO,TCSANOW,&modified);
+  if(ret!=0)
+    { fprintf(stderr, "tcsetattr error: %s", strerror(errno));
+      exit(1);
+    }
+  //printf("at least this stage");
+  if(shellflag==0){
+    //printf("has entered this loop");
+    ssize_t res=0;
+    char buffer[256];
+    while((res=read(STDIN_FILENO,buffer,256))>0)
+      {
+	for(int i=0;i<res;i++)
+	  {
+	    char selected=buffer[i];
+	    switch(selected){
+	     case 0x0D:
+	     case 0x0A:
+	       
+	       ret=write(STDOUT_FILENO,minibuffer,2);  //2 instead of 1
+	       if(ret<0)
+		 { fprintf(stderr, "write error: %s", strerror(errno));
+		   exit(1);
+		 }
+	       break;
+	     case 0x04:
+	       exit(1);
+	       break;
+	     default:
+	       ret=write(STDOUT_FILENO,buffer+i,1);
+	       if(ret<0)
+		 { fprintf(stderr, "write error: %s", strerror(errno));
+		   exit(1);
+		 }
+	    }
+	  }
+      }
+  }
+  else{ //when shellflag is set
+    signal(SIGPIPE, handler); //one of the scenario, write to pipe with no readers
+    
+    ret=pipe(terminaltoshell);
+    if(ret<0){
+      fprintf(stderr,"error set by pipe: %s",strerror(errno));
+      exit(1);	      }
+    ret=pipe(shelltoterminal);
+    if(ret<0){
+      fprintf(stderr,"error set by pipe: %s",strerror(errno));
+      exit(1);	      }
+    
+    catch=fork();
+    if(catch<0){
+      fprintf(stderr,"errno is set by fork: %s",strerror(errno));
+      exit(1);
+    }
+    else if(catch==0){
+      //in child process
+     ret=close(terminaltoshell[1]);
+     if(ret<0){
+       fprintf(stderr,"close pipe is not successful: %s",strerror(errno));
+       exit(1);
+      }
+     ret=close(shelltoterminal[0]);
+     if(ret<0){
+       fprintf(stderr,"close pipe is not successful: %s",strerror(errno));
+       exit(1);
+      }
+     ret=dup2(terminaltoshell[0],0);//should not matter
+     if(ret<0){
+       fprintf(stderr,"dup is not successful: %s",strerror(errno));
+       exit(1);
+      }
+     ret=dup2(shelltoterminal[1],1);
+     if(ret<0){
+       fprintf(stderr,"dup is not successful: %s",strerror(errno));
+       exit(1);
+      }
+     ret=dup2(shelltoterminal[1],2);
+     if(ret<0){
+       fprintf(stderr,"dup is not successful: %s",strerror(errno));
+       exit(1);
+      }
+     ret=close(terminaltoshell[0]);
+     if(ret<0){
+       fprintf(stderr,"close pipe is not successful: %s",strerror(errno));
+       exit(1);
+      }
+     ret=close(shelltoterminal[1]);
+     if(ret<0){
+       fprintf(stderr,"close pipe is not successful: %s",strerror(errno));
+       exit(1);
+      }
+     char chararray[]="/bin/bash";
+     char* pointerarray[2];
+     pointerarray[0]=chararray;
+     pointerarray[1]=NULL;
+     ret=execvp(chararray,pointerarray);
+     if(ret<0){
+       fprintf(stderr,"execvp is not successful: %s",strerror(errno));
+       exit(1);
+      }
+    }
+    else { //when in parent, child pid is returned
+       ret=close(terminaltoshell[0]);
+       if(ret<0){
+       fprintf(stderr,"close pipe is not successful: %s",strerror(errno));
+       exit(1);
+       } 
+       ret=close(shelltoterminal[1]);
+       if(ret<0){
+       fprintf(stderr,"close pipe is not successful: %s",strerror(errno));
+       exit(1);
+       }
+       struct pollfd listen[2];
+       listen[0].fd=STDIN_FILENO;
+       listen[0].events= POLLIN | POLLHUP |POLLERR;
+       listen[1].fd=shelltoterminal[0];
+       listen[1].events= POLLIN | POLLHUP |POLLERR;
+       while(1){
+	 ret=poll(listen,2,0);
+	 if(ret<0){
+	   fprintf(stderr,"poll is not successful: %s",strerror(errno));
+	   exit(1);
+	 }
+	 if(listen[0].revents & POLLIN){
+	   //printf("it inside this state1\n\n\n\n");
+	   //read and write from terminal
+	   ssize_t res=0;
+	   char buffer1[256];
+	   res=read(STDIN_FILENO,buffer1,256);
+	     
+	       for(int i=0;i<res;i++)
+		 {
+		   char selected=buffer1[i];
+		   switch(selected){
+		   case '\r':
+		   case '\n':
+		     
+		     ret=write(terminaltoshell[1],smallbuffer,1);  //2 instead of 1
+		     if(ret<0)
+		       { fprintf(stderr, "write error: %s", strerror(errno));
+			 exit(1);
+		       }
+		     ret=write(STDOUT_FILENO,minibuffer,2);  //2 instead of 1
+		     if(ret<0)
+		       { fprintf(stderr, "write error: %s", strerror(errno));
+			 exit(1);
+		       }
+		     break;
+		   case 0x04:
+		     ret=close(terminaltoshell[1]);
+		     if(ret<0)
+		       { fprintf(stderr, "close error: %s", strerror(errno));
+			 exit(1);
+		       }
+		     break;
+		   case 0x03:
+		     kill(catch,SIGINT);  //hope catch is defined in this scope
+		     break;
+		   default:
+		     ret=write(STDOUT_FILENO,buffer1+i,1);
+		     if(ret<0)
+		       { fprintf(stderr, "write error: %s", strerror(errno));
+			 exit(1);
+		       }
+		     ret=write(terminaltoshell[1],buffer1+i,1);
+		     if(ret<0)
+		       { fprintf(stderr, "write error: %s", strerror(errno));
+			 exit(1);
+		       }
+		   }
+		 }
+	     //end of the read and write
+	 }//the case of parent end read and write
+	 if(listen[1].revents & POLLIN){
+	               ssize_t res=0;
+	   char buffer2[256];
+	   res=read(shelltoterminal[0],buffer2,256);//read from shell and send out
+	     
+	       for(int i=0;i<res;i++)
+		 {
+		   char selected=buffer2[i];
+		   switch(selected){
+		   
+		   case 0x0A:
+		    
+		     ret=write(STDOUT_FILENO,minibuffer,2);  //2 instead of 1
+		     if(ret<0)
+		       { fprintf(stderr, "write error: %s", strerror(errno));
+			 exit(1);
+		       }
+		     break;
+		   default:
+		     ret=write(STDOUT_FILENO,buffer2+i,1);
+		     if(ret<0)
+		       { fprintf(stderr, "write error: %s", strerror(errno));
+			 exit(1);
+		       }
+		     
+		   }
+		 }
+	     //end of the read and write
+	   
+	 }//case of return back read and write
+	 if(listen[1].revents & (POLLHUP | POLLERR))
+	   {exit(0);}
+       }//while poll loop ends at here
+
+
+
+
+
+
+    } //baskstick for parent
+  } //backbracker for shell option 
+    //if necessary,manully exit 0 here
+}

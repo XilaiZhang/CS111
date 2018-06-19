@@ -1,0 +1,29 @@
+NAME: Xilai Zhang
+
+EMAIL: xilaizhang@g.ucla.edu
+
+ID: 804796478
+
+Included files:
+lab1a.c: source code for project1a. This project practice the skills to set up
+pipes between the terminal and the shell. In this lab, we can read 
+and write from both directions. We also learnt how to restore and change
+the terminal mode.
+
+Makefile:
+support dist,clean and default. dist creates a tarball for submission. clean
+remove redundant files. default compiles lab1a.c and generate lab1a.
+
+README:
+brief description about everything.
+
+other information:
+I noticed something about the test script and posted a question on Piazza, see
+question@99.
+I also noticed something about the linux server and posted a note on Piazza
+, see note@113.
+
+I read the Linux man page for termios, tcgetattr, tcsetattr,fork,waitpid,exec,
+pipe,kill strerror,poll. And TA BU ZHAOXING also talked about a lot of APIs 
+in class. And he showed us the gnu library page for noncanonical mode.
+http://man7.org/linux/man-pages/man3/termios.3.html
